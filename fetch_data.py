@@ -24,6 +24,10 @@ values %s
 on conflict (kode, tanggal) do update set
   open = excluded.open, high = excluded.high, low = excluded.low,
   close = excluded.close, volume = excluded.volume, diperbarui = now()
+where (harga_harian.open, harga_harian.high, harga_harian.low,
+       harga_harian.close, harga_harian.volume)
+  is distinct from (excluded.open, excluded.high, excluded.low,
+       excluded.close, excluded.volume)
 """
 
 
