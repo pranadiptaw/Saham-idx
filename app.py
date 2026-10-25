@@ -3,6 +3,8 @@ import plotly.graph_objects as go
 import streamlit as st
 from plotly.subplots import make_subplots
 from sqlalchemy import create_engine, text
+
+from screener_pro import tampilkan_screener_pro
 from tab_indikator import tampilkan_tab_indikator
 
 st.set_page_config(page_title="Dashboard Saham IDX", layout="wide")
@@ -24,6 +26,15 @@ def sql(q: str, params: tuple = ()) -> pd.DataFrame:
         return pd.read_sql(text(q), c, params=dict(zip([f"p{i}" for i in range(len(params))], params)))
 
 
+def hilangkan_celah(fig, tanggal):
+    """Buang Sabtu, Minggu, dan hari libur (hari tanpa data) dari sumbu tanggal."""
+    t = pd.to_datetime(pd.Series(tanggal).unique())
+    if len(t) < 2:
+        return
+    kosong = pd.date_range(t.min(), t.max()).difference(t)
+    fig.update_xaxes(rangebreaks=[dict(values=kosong.strftime("%Y-%m-%d").tolist())])
+
+
 info = sql("select max(tanggal) as tgl, max(diperbarui) as upd, count(distinct kode) as n from harga_harian")
 if info["tgl"].iloc[0] is None:
     st.warning("Database masih kosong. Jalankan backfill dulu.")
@@ -35,7 +46,8 @@ kode_list = sql("select distinct kode from harga_harian order by kode")["kode"].
 hari = st.sidebar.selectbox("Rentang", [30, 90, 180, 365, 730, 1825], index=3,
                             format_func=lambda x: f"{x} hari")
 
-tab1, tab2, tab3, tab4 = st.tabs(["Grafik satu saham", "Bandingkan", "Screener", "Indikator"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(
+    ["Grafik satu saham", "Bandingkan", "Screener", "Indikator", "Screener Pro"])
 
 with tab1:
     k = st.selectbox("Saham", kode_list, index=kode_list.index("BBCA") if "BBCA" in kode_list else 0)
@@ -54,6 +66,7 @@ with tab1:
         fig.add_trace(go.Scatter(x=df["tanggal"], y=df["close"].rolling(ma_b).mean(), name=f"MA{ma_b}"), row=1, col=1)
         fig.add_trace(go.Bar(x=df["tanggal"], y=df["volume"], name="Volume"), row=2, col=1)
         fig.update_layout(height=650, xaxis_rangeslider_visible=False, margin=dict(t=20, b=20))
+        hilangkan_celah(fig, df["tanggal"])
         st.plotly_chart(fig, use_container_width=True)
 
 with tab2:
@@ -65,6 +78,7 @@ with tab2:
         for kd, g in df.groupby("kode"):
             fig.add_trace(go.Scatter(x=g["tanggal"], y=g["close"] / g["close"].iloc[0] * 100, name=kd))
         fig.update_layout(height=550, yaxis_title="Indeks (awal = 100)", margin=dict(t=20))
+        hilangkan_celah(fig, df["tanggal"])
         st.plotly_chart(fig, use_container_width=True)
 
 with tab3:
@@ -88,5 +102,9 @@ with tab3:
                      use_container_width=True, height=520)
     else:
         st.info("Belum cukup data untuk screener.")
+
 with tab4:
     tampilkan_tab_indikator(sql, kode_list, hari)
+
+with tab5:
+    tampilkan_screener_pro(sql)
