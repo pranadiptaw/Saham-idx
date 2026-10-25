@@ -14,9 +14,9 @@ import yfinance as yf
 from psycopg2.extras import execute_values
 
 MODE = sys.argv[1] if len(sys.argv) > 1 else "daily"
-PERIOD = "5y" if MODE == "backfill" else "5d"
-UKURAN = 40   # saham per kelompok
-JEDA = 4      # detik antar kelompok
+PERIOD = "max" if MODE == "backfill" else "5d"
+UKURAN = 25   # saham per kelompok
+JEDA = 6      # detik antar kelompok
 
 UPSERT = """
 insert into harga_harian (kode, tanggal, open, high, low, close, volume)
