@@ -1,0 +1,26 @@
+name: Tarik data saham
+
+on:
+  schedule:
+    - cron: "0 5 * * 1-5"    # 12:00 WIB, Senin-Jumat
+    - cron: "30 9 * * 1-5"   # 16:30 WIB, Senin-Jumat
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "daily atau backfill"
+        default: "daily"
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: python fetch_data.py ${{ github.event.inputs.mode || 'daily' }}
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
