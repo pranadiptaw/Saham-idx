@@ -3,6 +3,7 @@ import plotly.graph_objects as go
 import streamlit as st
 from plotly.subplots import make_subplots
 from sqlalchemy import create_engine, text
+from tab_indikator import tampilkan_tab_indikator
 
 st.set_page_config(page_title="Dashboard Saham IDX", layout="wide")
 st.title("Dashboard Saham IDX")
@@ -34,7 +35,7 @@ kode_list = sql("select distinct kode from harga_harian order by kode")["kode"].
 hari = st.sidebar.selectbox("Rentang", [30, 90, 180, 365, 730, 1825], index=3,
                             format_func=lambda x: f"{x} hari")
 
-tab1, tab2, tab3 = st.tabs(["Grafik satu saham", "Bandingkan", "Screener"])
+tab1, tab2, tab3, tab4 = st.tabs(["Grafik satu saham", "Bandingkan", "Screener", "Indikator"])
 
 with tab1:
     k = st.selectbox("Saham", kode_list, index=kode_list.index("BBCA") if "BBCA" in kode_list else 0)
@@ -87,3 +88,5 @@ with tab3:
                      use_container_width=True, height=520)
     else:
         st.info("Belum cukup data untuk screener.")
+with tab4:
+    tampilkan_tab_indikator(sql, kode_list, hari)
