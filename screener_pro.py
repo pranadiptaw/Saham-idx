@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
+from chart_tv import tampilkan_tv
 from indikator import atr, ema, rsi, sma
 
 # Indikator: nama -> periode bawaan (None = tidak butuh periode)
@@ -80,8 +81,14 @@ def nilai_terakhir(g: pd.DataFrame, jenis: str, n):
     return (c.iloc[-1] / ma - 1) * 100 if jenis.startswith("Jarak") else ma
 
 
-@st.cache_resource(ttl=3600, show_spinner="Memuat data semua saham...")
-def muat_grup(_sql):
+def versi_data(sql):
+    """Penanda versi data: berubah setiap kali ada baris yang diperbarui di database."""
+    d = sql("select max(tanggal) as tgl, max(diperbarui) as upd from harga_harian")
+    return f"{d['tgl'].iloc[0]}|{d['upd'].iloc[0]}"
+
+
+@st.cache_resource(ttl=3600, max_entries=1, show_spinner="Memuat data semua saham...")
+def muat_grup(_sql, versi):
     d = _sql("select kode, tanggal, high, low, close, volume from harga_harian "
              "where tanggal >= current_date - 1200 order by kode, tanggal")
     d = d.dropna(subset=["close"])
@@ -90,7 +97,7 @@ def muat_grup(_sql):
     return grup, (str(d["tanggal"].max()) if len(d) else "-"), len(d)
 
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@st.cache_data(ttl=3600, max_entries=300, show_spinner=False)
 def hitung_kolom(_grup, versi, jenis, n):
     """Nilai satu indikator untuk semua saham. 'versi' hanya penanda agar cache ikut berganti saat data baru."""
     hasil = {}
@@ -159,11 +166,17 @@ def warna(v):
 
 
 def tampilkan_screener_pro(sql):
-    grup, versi, baris = muat_grup(sql)
+    versi = versi_data(sql)
+    grup, tgl_data, baris = muat_grup(sql, versi)
     if not grup:
         st.info("Belum ada data.")
         return
-    st.caption(f"Data per {versi} | {len(grup)} saham | sumber: Yahoo Finance")
+    kiri, kanan = st.columns([5, 1])
+    kiri.caption(f"Data per {tgl_data} | {len(grup)} saham | sumber: Yahoo Finance")
+    if kanan.button("Muat ulang data"):
+        st.cache_data.clear()
+        st.cache_resource.clear()
+        st.rerun()
 
     with st.expander("Filter: pilih indikator, isi periode bebas, operator, dan nilai", expanded=True):
         syarat = st.data_editor(
@@ -218,9 +231,23 @@ def tampilkan_screener_pro(sql):
     urut = st.selectbox("Urutkan berdasarkan", list(tabel.columns), index=1 if len(tabel.columns) > 1 else 0)
     tabel = tabel.sort_values(urut, ascending=(arah == "Menaik"), na_position="last")
 
-    st.write(f"**{len(tabel)}** dari {len(grup)} saham memenuhi syarat")
+    st.write(f"**{len(tabel)}** dari {len(grup)} saham memenuhi syarat. "
+             "Klik kotak di kiri baris untuk membuka chart TradingView-nya.")
     gaya = tabel.style.format({j: FORMAT[f] for j, (_, f) in kolom.items()}, na_rep="—")
     pct = [j for j, (_, f) in kolom.items() if f == "pct"]
     if pct:
         gaya = gaya.map(warna, subset=pct)
-    st.dataframe(gaya, use_container_width=True, height=620)
+    terpilih = None
+    try:
+        acara = st.dataframe(gaya, use_container_width=True, height=620, key="tabel_pro",
+                             on_select="rerun", selection_mode="single-row")
+        if acara.selection.rows:
+            terpilih = tabel.index[acara.selection.rows[0]]
+    except TypeError:                       # Streamlit lama tanpa fitur klik baris
+        st.dataframe(gaya, use_container_width=True, height=620)
+    manual = st.selectbox("Atau pilih saham dari hasil", ["-"] + list(tabel.index), key="pilih_chart_pro")
+    if terpilih is None and manual != "-":
+        terpilih = manual
+    if terpilih is not None:
+        st.subheader(f"Chart {terpilih}")
+        tampilkan_tv(terpilih, kunci="pro")

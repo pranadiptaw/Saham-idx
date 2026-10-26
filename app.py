@@ -4,10 +4,13 @@ import streamlit as st
 from plotly.subplots import make_subplots
 from sqlalchemy import create_engine, text
 
+from chart_tv import tampilkan_tv
 from screener_pro import tampilkan_screener_pro
 from tab_indikator import tampilkan_tab_indikator
+from tampilan import terapkan_gaya
 
 st.set_page_config(page_title="Dashboard Saham IDX", layout="wide")
+terapkan_gaya()
 st.title("Dashboard Saham IDX")
 
 
@@ -46,8 +49,8 @@ kode_list = sql("select distinct kode from harga_harian order by kode")["kode"].
 hari = st.sidebar.selectbox("Rentang", [30, 90, 180, 365, 730, 1825], index=3,
                             format_func=lambda x: f"{x} hari")
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs(
-    ["Grafik satu saham", "Bandingkan", "Screener", "Indikator", "Screener Pro"])
+tab_pro, tab_tv, tab4, tab1, tab2, tab3 = st.tabs(
+    ["Screener Pro", "Chart TradingView", "Indikator", "Grafik (data sendiri)", "Bandingkan", "Screener lama"])
 
 with tab1:
     k = st.selectbox("Saham", kode_list, index=kode_list.index("BBCA") if "BBCA" in kode_list else 0)
@@ -106,5 +109,9 @@ with tab3:
 with tab4:
     tampilkan_tab_indikator(sql, kode_list, hari)
 
-with tab5:
+with tab_pro:
     tampilkan_screener_pro(sql)
+
+with tab_tv:
+    k_tv = st.selectbox("Saham", kode_list, index=kode_list.index("BBCA") if "BBCA" in kode_list else 0, key="tv_saham")
+    tampilkan_tv(k_tv, tinggi=700, kunci="tab")

@@ -6,8 +6,14 @@ import streamlit as st
 from indikator import baris_terakhir, hitung_indikator
 
 
-@st.cache_data(ttl=3600, show_spinner="Menghitung indikator semua saham...")
-def tabel_indikator(_sql):
+def versi_data(sql):
+    """Penanda versi data: berubah setiap kali ada baris yang diperbarui di database."""
+    d = sql("select max(tanggal) as tgl, max(diperbarui) as upd from harga_harian")
+    return f"{d['tgl'].iloc[0]}|{d['upd'].iloc[0]}"
+
+
+@st.cache_data(ttl=3600, max_entries=2, show_spinner="Menghitung indikator semua saham...")
+def tabel_indikator(_sql, versi):
     d = _sql("select kode, tanggal, open, high, low, close, volume from harga_harian "
              "where tanggal >= current_date - 1200 order by kode, tanggal")
     return baris_terakhir(d)
@@ -55,7 +61,7 @@ def tampilkan_tab_indikator(sql, kode_list, hari):
 
     st.divider()
     st.subheader("Screener indikator (semua saham)")
-    hasil = tabel_indikator(sql)
+    hasil = tabel_indikator(sql, versi_data(sql))
     if hasil.empty:
         st.info("Belum ada data.")
     else:
